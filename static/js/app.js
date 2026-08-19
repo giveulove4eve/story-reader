@@ -57,8 +57,13 @@ document.addEventListener("DOMContentLoaded", () => {
   updateTextStats();
 });
 
-// 获取服务器与局域网 IP
+// 获取服务器与局域网 / 公网地址
 async function fetchServerInfo() {
+  // 如果是在 Render / 云端运行，直接展示当前公网网址
+  if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    lanUrlText.textContent = window.location.origin;
+    return;
+  }
   try {
     const res = await fetch("/api/info");
     const data = await res.json();
@@ -66,9 +71,10 @@ async function fetchServerInfo() {
       lanUrlText.textContent = data.lan_url;
     }
   } catch (err) {
-    console.warn("获取服务器信息失败", err);
+    lanUrlText.textContent = window.location.origin;
   }
 }
+
 
 // 获取音色列表
 async function fetchVoices() {

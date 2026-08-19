@@ -282,7 +282,6 @@ body {
   padding-right: 4px;
 }
 
-/* 自定义滚动条 */
 .voice-grid::-webkit-scrollbar {
   width: 6px;
 }
@@ -589,7 +588,7 @@ input[type=range] {
 }
 
 .modal.hidden {
-  display: none;
+  display: none !important;
 }
 
 .modal-backdrop {
