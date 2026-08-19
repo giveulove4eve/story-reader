@@ -1,0 +1,16 @@
+{
+  "name": "故事朗读器 · 拟真读词",
+  "short_name": "故事朗读",
+  "description": "极具真人起伏感的生动故事朗读小工具",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
