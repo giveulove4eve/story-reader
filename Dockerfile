@@ -6,11 +6,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 复制项目代码
+# 复制项目所有文件
 COPY . .
 
-# 暴露默认端口
-EXPOSE 8000
+# Hugging Face Space 默认端口为 7860
+EXPOSE 7860
 
-# 启动服务
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
