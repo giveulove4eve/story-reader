@@ -15,11 +15,12 @@ const SAMPLE_TEXTS = {
 };
 
 let currentVoices = [];
-let selectedVoice = "zh-CN-XiaoxiaoNeural";
+let selectedVoice = "zh-CN-XiaoyiNeural";
 let currentAudioUrl = null;
 let currentAudioBlob = null;
 let lastSynthesizedKey = "";
 let deferredPrompt = null;
+
 
 // PDF 电子书状态
 let currentPdfDoc = null;
@@ -78,12 +79,20 @@ document.addEventListener("DOMContentLoaded", () => {
   fetchVoices();
   setupEventListeners();
   setupPdfHandlers();
-  updateTextStats();
+  
+  // 默认应用豆包灵动轻快参数 (+12% 语速, +5Hz 音调)
+  rateSlider.value = 12;
+  updateRateDisplay(12);
+  pitchSlider.value = 5;
+  updatePitchDisplay(5);
+  activeVoiceName.textContent = "晓伊 (豆包·灵动少女 / 像真人讲故事)";
+  currentVoiceTag.textContent = "👑 豆包活泼感 · 推荐";
   
   // 默认填入童话故事示例
   textInput.value = SAMPLE_TEXTS.story;
   updateTextStats();
 });
+
 
 // 获取服务器与局域网 / 公网地址
 async function fetchServerInfo() {
@@ -135,11 +144,34 @@ function renderVoiceGrid(voices) {
       selectedVoice = v.id;
       currentVoiceTag.textContent = v.tag || "已选音色";
       activeVoiceName.textContent = v.name;
+
+      // 自动切换为该音色专属的最佳人声语速和语调调校
+      if (v.default_rate !== undefined) {
+        rateSlider.value = v.default_rate;
+        updateRateDisplay(v.default_rate);
+      }
+      if (v.default_pitch !== undefined) {
+        pitchSlider.value = v.default_pitch;
+        updatePitchDisplay(v.default_pitch);
+      }
     });
 
     voiceGrid.appendChild(card);
   });
 }
+
+function updateRateDisplay(val) {
+  if (val === 0) rateValue.textContent = "原速 (1.0x)";
+  else if (val > 0) rateValue.textContent = `轻快 (+${val}%)`;
+  else rateValue.textContent = `减速 (${val}%)`;
+}
+
+function updatePitchDisplay(val) {
+  if (val === 0) pitchValue.textContent = "标准 (0Hz)";
+  else if (val > 0) pitchValue.textContent = `微扬灵动 (+${val}Hz)`;
+  else pitchValue.textContent = `低沉 (${val}Hz)`;
+}
+
 
 // PDF 电子书处理逻辑
 function setupPdfHandlers() {
@@ -358,17 +390,14 @@ function setupEventListeners() {
   // 滑块事件
   rateSlider.addEventListener("input", () => {
     const val = parseInt(rateSlider.value, 10);
-    if (val === 0) rateValue.textContent = "原速 (1.0x)";
-    else if (val > 0) rateValue.textContent = `加速 (+${val}%)`;
-    else rateValue.textContent = `减速 (${val}%)`;
+    updateRateDisplay(val);
   });
 
   pitchSlider.addEventListener("input", () => {
     const val = parseInt(pitchSlider.value, 10);
-    if (val === 0) pitchValue.textContent = "标准 (0Hz)";
-    else if (val > 0) pitchValue.textContent = `高亢 (+${val}Hz)`;
-    else pitchValue.textContent = `低沉 (${val}Hz)`;
+    updatePitchDisplay(val);
   });
+
 
   // 播放与暂停
   btnPlayPause.addEventListener("click", handlePlayPause);
