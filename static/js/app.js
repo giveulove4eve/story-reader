@@ -143,12 +143,9 @@ function renderVoiceGrid(voices) {
 
 // PDF 电子书处理逻辑
 function setupPdfHandlers() {
-  // 点击上传按钮唤起文件选择
-  btnUploadPdf.addEventListener("click", () => pdfFileInput.click());
-
-  // 文件选择变更
+  // 文件选择变更 (由于使用原生 <label for="pdf-file-input">，无需在 JS 中重复调用 .click())
   pdfFileInput.addEventListener("change", (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
     if (file) {
       processPdfFile(file);
     }
@@ -225,11 +222,7 @@ function processPdfFile(file) {
   reader.onload = async function(e) {
     try {
       const typedArray = new Uint8Array(e.target.result);
-      const loadingTask = pdfjsLib.getDocument({
-        data: typedArray,
-        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
-        cMapPacked: true
-      });
+      const loadingTask = pdfjsLib.getDocument({ data: typedArray });
       
       currentPdfDoc = await loadingTask.promise;
       totalPdfPages = currentPdfDoc.numPages;
@@ -247,6 +240,7 @@ function processPdfFile(file) {
 
       // 提取第 1 页内容
       await loadPdfPage(1, false);
+
 
       // 重置 input 以便下次可以重新选择同名文件
       if (pdfFileInput) pdfFileInput.value = "";
