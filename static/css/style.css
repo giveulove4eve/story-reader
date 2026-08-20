@@ -147,6 +147,13 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.section-title-wrap {
+  display: flex;
+  align-items: baseline;
 }
 
 .section-title {
@@ -163,6 +170,7 @@ body {
 .quick-tools {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .tool-btn {
@@ -174,11 +182,161 @@ body {
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .tool-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   color: var(--text-primary);
+}
+
+/* PDF 上传按键高亮 */
+.btn-pdf-upload {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #c7d2fe;
+  font-weight: 500;
+}
+.btn-pdf-upload:hover {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+}
+
+/* PDF 电子书专用控制栏 */
+.pdf-toolbar {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+  animation: fadeIn 0.3s ease;
+}
+
+.pdf-toolbar-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pdf-book-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdf-icon {
+  font-size: 1.2rem;
+}
+
+.pdf-book-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-sub-tool {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-sub-tool:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.pdf-toolbar-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pdf-nav-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-page {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--card-border);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-page:hover:not(:disabled) {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.btn-page:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.page-input {
+  width: 54px;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 4px 6px;
+  border-radius: 6px;
+  outline: none;
+}
+
+.page-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.auto-continue-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: #cbd5e1;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-continue-wrap input[type=checkbox] {
+  accent-color: var(--primary);
+  cursor: pointer;
 }
 
 /* 快速预设标签 */
@@ -390,7 +548,7 @@ input[type=range] {
   transform: translateX(-50%);
   width: calc(100% - 40px);
   max-width: 1160px;
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(15, 23, 42, 0.9);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -465,7 +623,6 @@ input[type=range] {
   white-space: nowrap;
 }
 
-/* 动态波形动画 */
 .audio-wave {
   display: flex;
   align-items: center;
@@ -491,7 +648,6 @@ input[type=range] {
   100% { height: 16px; }
 }
 
-/* 进度条 */
 .progress-container {
   flex: 1;
   display: flex;
@@ -542,7 +698,6 @@ input[type=range] {
   opacity: 1;
 }
 
-/* 播放器工具按键 */
 .player-tools {
   display: flex;
   align-items: center;
@@ -574,7 +729,6 @@ input[type=range] {
   padding: 8px 12px;
 }
 
-/* 弹窗 Modal */
 .modal {
   position: fixed;
   top: 0;
@@ -688,7 +842,11 @@ input[type=range] {
   display: none !important;
 }
 
-/* 移动端响应式 (手机屏幕) */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (max-width: 768px) {
   .app-container {
     padding: 14px 12px 180px;
@@ -705,6 +863,16 @@ input[type=range] {
 
   .sliders-grid {
     grid-template-columns: 1fr;
+  }
+
+  .pdf-toolbar-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pdf-nav-buttons {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .player-bar {

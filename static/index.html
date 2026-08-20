@@ -11,6 +11,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- PDF.js 解析引擎 (纯前端本地秒级解析，保护隐私且手机通用) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <link rel="stylesheet" href="/css/style.css">
   <style>
     :root {
@@ -160,6 +162,13 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .section-title-wrap {
+      display: flex;
+      align-items: baseline;
     }
 
     .section-title {
@@ -176,6 +185,7 @@
     .quick-tools {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .tool-btn {
@@ -187,6 +197,9 @@
       border-radius: var(--radius-sm);
       cursor: pointer;
       transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
 
     .tool-btn:hover {
@@ -194,6 +207,154 @@
       color: var(--text-primary);
     }
 
+    /* PDF 上传按键 */
+    .btn-pdf-upload {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: rgba(99, 102, 241, 0.4);
+      color: #c7d2fe;
+      font-weight: 500;
+    }
+    .btn-pdf-upload:hover {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+    }
+
+    /* PDF 电子书专用控制栏 */
+    .pdf-toolbar {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(99, 102, 241, 0.35);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
+      animation: fadeIn 0.3s ease;
+    }
+
+    .pdf-toolbar-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .pdf-book-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pdf-icon {
+      font-size: 1.2rem;
+    }
+
+    .pdf-book-title {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #f1f5f9;
+      max-width: 260px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .btn-sub-tool {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-sub-tool:hover {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    .pdf-toolbar-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .pdf-nav-buttons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-page {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      color: var(--text-primary);
+      font-size: 0.8rem;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-page:hover:not(:disabled) {
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .btn-page:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .page-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+
+    .page-input {
+      width: 54px;
+      text-align: center;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(99, 102, 241, 0.4);
+      color: #a5b4fc;
+      font-weight: 600;
+      font-size: 0.9rem;
+      padding: 4px 6px;
+      border-radius: 6px;
+      outline: none;
+    }
+
+    .page-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+
+    .auto-continue-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: #cbd5e1;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .auto-continue-wrap input[type=checkbox] {
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    /* 快速预设标签 */
     .presets-container {
       margin-bottom: 14px;
     }
@@ -228,6 +389,7 @@
       color: #c7d2fe;
     }
 
+    /* 文本输入框 */
     .textarea-wrapper {
       position: relative;
     }
@@ -257,6 +419,7 @@
       color: var(--text-muted);
     }
 
+    /* 控制面板与音色卡片 */
     .control-group {
       margin-bottom: 20px;
     }
@@ -347,6 +510,7 @@
       white-space: nowrap;
     }
 
+    /* 滑块组 */
     .sliders-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -391,6 +555,7 @@
       margin-top: 4px;
     }
 
+    /* 底部常驻播放器 */
     .player-bar {
       position: fixed;
       bottom: 20px;
@@ -692,6 +857,11 @@
       display: none !important;
     }
 
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     @media (max-width: 768px) {
       .app-container {
         padding: 14px 12px 180px;
@@ -708,6 +878,16 @@
 
       .sliders-grid {
         grid-template-columns: 1fr;
+      }
+
+      .pdf-toolbar-controls {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .pdf-nav-buttons {
+        width: 100%;
+        justify-content: space-between;
       }
 
       .player-bar {
@@ -745,7 +925,7 @@
         <div class="logo-icon">🎙️</div>
         <div>
           <h1 class="logo-title">故事朗读器</h1>
-          <p class="logo-subtitle">拟真情感 · 讲故事语气 · 支持手机端</p>
+          <p class="logo-subtitle">拟真情感 · 讲故事语气 · 支持手机端与 PDF 电子书</p>
         </div>
       </div>
       <div class="nav-actions">
@@ -778,7 +958,7 @@
               <li>在手机 <strong>Chrome 或自带浏览器</strong> 中打开本网址；</li>
               <li>点击浏览器右上角的 <strong>⋮（菜单）</strong>；</li>
               <li>选择 <strong>“添加到主屏幕”</strong> 或 <strong>“安装应用”</strong>；</li>
-              <li>桌面就会出现 App 图标，全屏无边框，随时复制文字粘贴听读！</li>
+              <li>桌面就会出现 App 图标，全屏无边框，随时复制文字或传 PDF 听读！</li>
             </ol>
           </div>
         </div>
@@ -787,7 +967,7 @@
 
     <!-- 主体区域 -->
     <main class="main-layout">
-      <!-- 左侧：文本输入与控制 -->
+      <!-- 左侧：文本输入与 PDF 控制 -->
       <section class="text-section card">
         <div class="section-header">
           <div class="section-title-wrap">
@@ -795,13 +975,44 @@
             <span id="text-stats" class="text-stats">0 字 · 约 0 秒</span>
           </div>
           <div class="quick-tools">
+            <!-- 隐藏的文件选择框 -->
+            <input type="file" id="pdf-file-input" accept=".pdf,application/pdf" class="hidden">
+            <button id="btn-upload-pdf" class="tool-btn btn-pdf-upload" title="上传 PDF 电子书并逐页选读">
+              📂 上传 PDF 电子书
+            </button>
             <button id="btn-paste" class="tool-btn" title="从剪贴板粘贴">📋 粘贴</button>
             <button id="btn-clear" class="tool-btn" title="清空文本">🗑️ 清空</button>
           </div>
         </div>
 
+        <!-- PDF 电子书专用控制栏 (上传 PDF 后自动展现) -->
+        <div id="pdf-toolbar" class="pdf-toolbar hidden">
+          <div class="pdf-toolbar-top">
+            <div class="pdf-book-meta">
+              <span class="pdf-icon">📖</span>
+              <span id="pdf-book-title" class="pdf-book-title">电子书.pdf</span>
+            </div>
+            <button id="btn-close-pdf" class="btn-sub-tool" title="退出 PDF 模式">✖ 退出电子书</button>
+          </div>
+          <div class="pdf-toolbar-controls">
+            <div class="pdf-nav-buttons">
+              <button id="btn-prev-page" class="btn-page" title="上一页">◀ 上一页</button>
+              <div class="page-indicator">
+                <span>第</span>
+                <input type="number" id="pdf-page-num" min="1" max="1" value="1" class="page-input">
+                <span>/ <span id="pdf-total-pages">1</span> 页</span>
+              </div>
+              <button id="btn-next-page" class="btn-page" title="下一页">下一页 ▶</button>
+            </div>
+            <label class="auto-continue-wrap" title="当前页朗读完毕后自动翻到下一页继续朗读">
+              <input type="checkbox" id="pdf-auto-continue" checked>
+              <span class="toggle-text">🔄 自动连续翻页朗读</span>
+            </label>
+          </div>
+        </div>
+
         <!-- 预设示例标签 -->
-        <div class="presets-container">
+        <div id="presets-container" class="presets-container">
           <span class="preset-label">快速试听示例：</span>
           <div class="preset-chips">
             <button class="chip" data-sample="story">🐰 寓言童话 (情感起伏)</button>
@@ -815,7 +1026,7 @@
         <div class="textarea-wrapper">
           <textarea 
             id="text-input" 
-            placeholder="在这里粘贴或输入你想听的文字... 
+            placeholder="在这里粘贴文字，或者点击上方【📂 上传 PDF 电子书】逐页选读... 
 晓晓、云希等声音会像真人讲故事一样，带呼吸停顿与情绪起伏读给你听！"
             rows="9"
           ></textarea>

@@ -1,4 +1,9 @@
-// 故事朗读器前端交互逻辑
+// 故事朗读器前端交互逻辑 (支持文本、多音色与 PDF 电子书逐页连读)
+
+// 配置 PDF.js worker
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
 
 const SAMPLE_TEXTS = {
   story: `森林里有一只骄傲的兔子，它总觉得自己跑得比谁都快。这一天，乌龟慢悠悠地从它身边爬过。兔子捧腹大笑：“乌龟老弟，你走得这么慢，明天早晨也到不了山顶吧！”乌龟停下脚步，微微一笑：“兔子，要不我们来比一场？”兔子胸有成竹地答应了。比赛一开始，兔子像一阵风一样冲了出去，而乌龟只是一步一个脚印，坚定地向前迈进……`,
@@ -13,6 +18,13 @@ let currentAudioUrl = null;
 let currentAudioBlob = null;
 let lastSynthesizedKey = "";
 let deferredPrompt = null;
+
+// PDF 电子书状态
+let currentPdfDoc = null;
+let currentPdfPage = 1;
+let totalPdfPages = 0;
+let currentPdfName = "";
+let autoPageTimer = null;
 
 // DOM 元素
 const textInput = document.getElementById("text-input");
@@ -45,11 +57,25 @@ const lanUrlText = document.getElementById("lan-url-text");
 const btnCopyLan = document.getElementById("btn-copy-lan");
 const btnInstallPwa = document.getElementById("btn-install-pwa");
 
+// PDF 相关 DOM
+const btnUploadPdf = document.getElementById("btn-upload-pdf");
+const pdfFileInput = document.getElementById("pdf-file-input");
+const pdfToolbar = document.getElementById("pdf-toolbar");
+const pdfBookTitle = document.getElementById("pdf-book-title");
+const btnPrevPage = document.getElementById("btn-prev-page");
+const btnNextPage = document.getElementById("btn-next-page");
+const pdfPageNum = document.getElementById("pdf-page-num");
+const pdfTotalPages = document.getElementById("pdf-total-pages");
+const pdfAutoContinue = document.getElementById("pdf-auto-continue");
+const btnClosePdf = document.getElementById("btn-close-pdf");
+const presetsContainer = document.getElementById("presets-container");
+
 // 初始化
 document.addEventListener("DOMContentLoaded", () => {
   fetchServerInfo();
   fetchVoices();
   setupEventListeners();
+  setupPdfHandlers();
   updateTextStats();
   
   // 默认填入童话故事示例
@@ -59,7 +85,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // 获取服务器与局域网 / 公网地址
 async function fetchServerInfo() {
-  // 如果是在 Render / 云端运行，直接展示当前公网网址
   if (window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
     lanUrlText.textContent = window.location.origin;
     return;
@@ -74,7 +99,6 @@ async function fetchServerInfo() {
     lanUrlText.textContent = window.location.origin;
   }
 }
-
 
 // 获取音色列表
 async function fetchVoices() {
@@ -115,9 +139,162 @@ function renderVoiceGrid(voices) {
   });
 }
 
+// PDF 电子书处理逻辑
+function setupPdfHandlers() {
+  // 点击上传按钮唤起文件选择
+  btnUploadPdf.addEventListener("click", () => pdfFileInput.click());
+
+  // 文件选择变更
+  pdfFileInput.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      processPdfFile(file);
+    }
+  });
+
+  // 支持直接将 PDF 拖拽到页面
+  window.addEventListener("dragover", (e) => e.preventDefault());
+  window.addEventListener("drop", (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      if (file.name.toLowerCase().endsWith(".pdf")) {
+        processPdfFile(file);
+      }
+    }
+  });
+
+  // 翻页操作
+  btnPrevPage.addEventListener("click", () => {
+    if (currentPdfDoc && currentPdfPage > 1) {
+      loadPdfPage(currentPdfPage - 1, false);
+    }
+  });
+
+  btnNextPage.addEventListener("click", () => {
+    if (currentPdfDoc && currentPdfPage < totalPdfPages) {
+      loadPdfPage(currentPdfPage + 1, false);
+    }
+  });
+
+  // 页码跳转输入
+  pdfPageNum.addEventListener("change", () => {
+    let page = parseInt(pdfPageNum.value, 10);
+    if (isNaN(page)) page = 1;
+    page = Math.max(1, Math.min(totalPdfPages, page));
+    pdfPageNum.value = page;
+    if (currentPdfDoc) {
+      loadPdfPage(page, false);
+    }
+  });
+
+  pdfPageNum.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      pdfPageNum.blur();
+    }
+  });
+
+  // 关闭 PDF 模式
+  btnClosePdf.addEventListener("click", () => {
+    currentPdfDoc = null;
+    totalPdfPages = 0;
+    currentPdfPage = 1;
+    pdfToolbar.classList.add("hidden");
+    presetsContainer.classList.remove("hidden");
+    pdfFileInput.value = "";
+    if (autoPageTimer) clearTimeout(autoPageTimer);
+    textInput.value = SAMPLE_TEXTS.story;
+    updateTextStats();
+  });
+}
+
+// 解析 PDF 文件
+function processPdfFile(file) {
+  if (!window.pdfjsLib) {
+    alert("PDF 解析组件正在加载，请稍候再试...");
+    return;
+  }
+
+  playStatusText.textContent = "正在读取 PDF 电子书...";
+  const reader = new FileReader();
+
+  reader.onload = async function(e) {
+    try {
+      const typedArray = new Uint8Array(e.target.result);
+      const loadingTask = pdfjsLib.getDocument({ data: typedArray });
+      currentPdfDoc = await loadingTask.promise;
+      totalPdfPages = currentPdfDoc.numPages;
+      currentPdfName = file.name;
+      currentPdfPage = 1;
+
+      // 更新 PDF 工具栏
+      pdfBookTitle.textContent = currentPdfName;
+      pdfTotalPages.textContent = totalPdfPages;
+      pdfPageNum.max = totalPdfPages;
+      pdfPageNum.value = 1;
+
+      pdfToolbar.classList.remove("hidden");
+      presetsContainer.classList.add("hidden");
+
+      // 提取第 1 页内容
+      await loadPdfPage(1, false);
+    } catch (err) {
+      alert(`解析 PDF 失败: ${err.message}`);
+      playStatusText.textContent = "解析 PDF 出错";
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+// 提取指定页码的文本
+async function loadPdfPage(pageNum, autoPlay = false) {
+  if (!currentPdfDoc) return;
+
+  currentPdfPage = pageNum;
+  pdfPageNum.value = pageNum;
+  btnPrevPage.disabled = (pageNum <= 1);
+  btnNextPage.disabled = (pageNum >= totalPdfPages);
+
+  playStatusText.textContent = `正在提取第 ${pageNum} 页文字...`;
+
+  try {
+    const page = await currentPdfDoc.getPage(pageNum);
+    const textContent = await page.getTextContent();
+    
+    // 合并段落文本
+    let extractedText = "";
+    let lastY = null;
+
+    textContent.items.forEach(item => {
+      // 简单根据 Y 坐标判断是否换行
+      if (lastY !== null && Math.abs(item.transform[5] - lastY) > 8) {
+        extractedText += "\n";
+      }
+      extractedText += item.str;
+      lastY = item.transform[5];
+    });
+
+    extractedText = extractedText.trim();
+    if (!extractedText) {
+      extractedText = `【第 ${pageNum} 页为图片或无文字内容】`;
+    }
+
+    textInput.value = extractedText;
+    updateTextStats();
+    playStatusText.textContent = `已就绪 (第 ${pageNum} / ${totalPdfPages} 页)`;
+
+    // 如果开启了连播，自动朗读本页
+    if (autoPlay && extractedText && !extractedText.startsWith("【第")) {
+      await startSpeechSynthesis();
+    }
+  } catch (err) {
+    console.error("提取页面文字失败:", err);
+  }
+}
+
 // 事件绑定
 function setupEventListeners() {
-  // 文本统计更新
   textInput.addEventListener("input", updateTextStats);
 
   // 预设示例点击
@@ -127,7 +304,6 @@ function setupEventListeners() {
       if (SAMPLE_TEXTS[type]) {
         textInput.value = SAMPLE_TEXTS[type];
         updateTextStats();
-        // 自动切对应推荐音色
         if (type === "novel") selectVoiceById("zh-CN-YunxiNeural");
         else if (type === "prose") selectVoiceById("zh-CN-XiaoyiNeural");
         else if (type === "news") selectVoiceById("zh-CN-YunjianNeural");
@@ -187,12 +363,24 @@ function setupEventListeners() {
     playStatusText.textContent = "已暂停";
     audioWave.classList.add("hidden");
   });
+
+  // 核心：当前页播放结束后的自动翻页逻辑
   audioPlayer.addEventListener("ended", () => {
     playIcon.textContent = "▶";
-    playStatusText.textContent = "朗读完毕";
     audioWave.classList.add("hidden");
     progressBar.style.width = "0%";
     currentTimeEl.textContent = "00:00";
+
+    // 如果处于 PDF 电子书模式，且开启了“自动连续翻页朗读”
+    if (currentPdfDoc && pdfAutoContinue.checked && currentPdfPage < totalPdfPages) {
+      playStatusText.textContent = `第 ${currentPdfPage} 页读完，1.5 秒后自动翻到第 ${currentPdfPage + 1} 页...`;
+      if (autoPageTimer) clearTimeout(autoPageTimer);
+      autoPageTimer = setTimeout(() => {
+        loadPdfPage(currentPdfPage + 1, true);
+      }, 1500);
+    } else {
+      playStatusText.textContent = "朗读完毕";
+    }
   });
 
   // 快退 / 快进
@@ -219,7 +407,8 @@ function setupEventListeners() {
     }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(currentAudioBlob);
-    a.download = `故事朗读_${new Date().toISOString().slice(0, 10)}.mp3`;
+    const bookPrefix = currentPdfDoc ? `${currentPdfName}_第${currentPdfPage}页_` : "故事朗读_";
+    a.download = `${bookPrefix}${new Date().toISOString().slice(0, 10)}.mp3`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -269,30 +458,26 @@ function updateTextStats() {
   textStats.textContent = `${count} 字 · 约 ${timeDesc}`;
 }
 
-// 解锁浏览器音频播放权限（针对 Safari / 手机浏览器的自动播放限制）
+// 解锁浏览器音频播放权限
 function unlockAudioContext() {
   if (!audioPlayer.src) {
-    // 播放 0.01 秒静音音频，解锁当前 audio 元素的自动播放上下文
     audioPlayer.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
   }
   const p = audioPlayer.play();
   if (p !== undefined) {
     p.then(() => {
       audioPlayer.pause();
-    }).catch(() => {
-      // 忽略预热阶段的异常
-    });
+    }).catch(() => {});
   }
 }
 
 async function handlePlayPause() {
   const text = textInput.value.trim();
   if (!text) {
-    alert("请先输入或粘贴你想朗读的文字内容！");
+    alert("请先输入或粘贴你想朗读的文字内容，或者上传 PDF 电子书！");
     return;
   }
 
-  // 第一时间在用户手势点击的同步阶段激活/解锁音频权限
   unlockAudioContext();
 
   const rate = parseInt(rateSlider.value, 10);
@@ -313,7 +498,18 @@ async function handlePlayPause() {
     return;
   }
 
-  // 开始向后端请求合成
+  await startSpeechSynthesis();
+}
+
+// 核心语音合成与播放请求
+async function startSpeechSynthesis() {
+  const text = textInput.value.trim();
+  if (!text) return;
+
+  const rate = parseInt(rateSlider.value, 10);
+  const pitch = parseInt(pitchSlider.value, 10);
+  const synthesisKey = `${text}_${selectedVoice}_${rate}_${pitch}`;
+
   playStatusText.textContent = "AI 正在酝酿情绪讲故事...";
   playIcon.textContent = "⏳";
   btnPlayPause.disabled = true;
@@ -349,7 +545,6 @@ async function handlePlayPause() {
     try {
       await audioPlayer.play();
     } catch (playErr) {
-      // 如果仍被浏览器策略拦截，提示用户直接点击播放按钮
       console.warn("Autoplay blocked, waiting for direct user tap:", playErr);
       playStatusText.textContent = "音频准备完毕，请点击播放 ▶";
       playIcon.textContent = "▶";
@@ -362,7 +557,6 @@ async function handlePlayPause() {
     btnPlayPause.disabled = false;
   }
 }
-
 
 function onTimeUpdate() {
   if (!audioPlayer.duration) return;
@@ -389,4 +583,3 @@ if ('serviceWorker' in navigator) {
     });
   });
 }
-
