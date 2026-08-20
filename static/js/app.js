@@ -1,9 +1,11 @@
-// 故事朗读器前端交互逻辑 (支持文本、多音色与 PDF 电子书逐页连读)
-
-// 配置 PDF.js worker
-if (window.pdfjsLib) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// 配置本地 PDF.js worker
+function initPdfJs() {
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/pdf.worker.min.js';
+  }
 }
+initPdfJs();
+
 
 const SAMPLE_TEXTS = {
   story: `森林里有一只骄傲的兔子，它总觉得自己跑得比谁都快。这一天，乌龟慢悠悠地从它身边爬过。兔子捧腹大笑：“乌龟老弟，你走得这么慢，明天早晨也到不了山顶吧！”乌龟停下脚步，微微一笑：“兔子，要不我们来比一场？”兔子胸有成竹地答应了。比赛一开始，兔子像一阵风一样冲了出去，而乌龟只是一步一个脚印，坚定地向前迈进……`,
@@ -210,18 +212,25 @@ function setupPdfHandlers() {
 
 // 解析 PDF 文件
 function processPdfFile(file) {
+  initPdfJs();
+
   if (!window.pdfjsLib) {
     alert("PDF 解析组件正在加载，请稍候再试...");
     return;
   }
 
-  playStatusText.textContent = "正在读取 PDF 电子书...";
+  playStatusText.textContent = `正在读取 PDF: ${file.name}...`;
   const reader = new FileReader();
 
   reader.onload = async function(e) {
     try {
       const typedArray = new Uint8Array(e.target.result);
-      const loadingTask = pdfjsLib.getDocument({ data: typedArray });
+      const loadingTask = pdfjsLib.getDocument({
+        data: typedArray,
+        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+        cMapPacked: true
+      });
+      
       currentPdfDoc = await loadingTask.promise;
       totalPdfPages = currentPdfDoc.numPages;
       currentPdfName = file.name;
@@ -238,14 +247,24 @@ function processPdfFile(file) {
 
       // 提取第 1 页内容
       await loadPdfPage(1, false);
+
+      // 重置 input 以便下次可以重新选择同名文件
+      if (pdfFileInput) pdfFileInput.value = "";
     } catch (err) {
+      console.error("PDF 解析失败:", err);
       alert(`解析 PDF 失败: ${err.message}`);
       playStatusText.textContent = "解析 PDF 出错";
     }
   };
 
+  reader.onerror = function() {
+    alert("读取文件失败，请检查文件权限或重试");
+    playStatusText.textContent = "读取文件失败";
+  };
+
   reader.readAsArrayBuffer(file);
 }
+
 
 // 提取指定页码的文本
 async function loadPdfPage(pageNum, autoPlay = false) {
