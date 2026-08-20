@@ -975,13 +975,14 @@
             <span id="text-stats" class="text-stats">0 字 · 约 0 秒</span>
           </div>
           <div class="quick-tools">
-            <!-- 隐藏的文件选择框 -->
-            <input type="file" id="pdf-file-input" accept=".pdf,application/pdf" class="hidden">
-            <button id="btn-upload-pdf" class="tool-btn btn-pdf-upload" title="上传 PDF 电子书并逐页选读">
+            <!-- 原生文件选择 Label (100% 触发系统文件选择弹窗) -->
+            <input type="file" id="pdf-file-input" accept=".pdf,application/pdf" style="position: fixed; top: -9999px; left: -9999px; opacity: 0; pointer-events: none;">
+            <label for="pdf-file-input" id="btn-upload-pdf" class="tool-btn btn-pdf-upload" style="cursor: pointer;" title="上传 PDF 电子书并逐页选读">
               📂 上传 PDF 电子书
-            </button>
+            </label>
             <button id="btn-paste" class="tool-btn" title="从剪贴板粘贴">📋 粘贴</button>
             <button id="btn-clear" class="tool-btn" title="清空文本">🗑️ 清空</button>
+
           </div>
         </div>
 
