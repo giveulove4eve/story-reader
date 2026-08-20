@@ -212,15 +212,30 @@ function processPdfFile(file) {
   initPdfJs();
 
   if (!window.pdfjsLib) {
-    alert("PDF 解析组件正在加载，请稍候再试...");
+    alert("PDF 解析引擎正在初始化，请稍候 1 秒再试...");
     return;
   }
 
-  playStatusText.textContent = `正在读取 PDF: ${file.name}...`;
+  // 立即给用户最显眼的视觉反馈：展开控制栏并显示书名与正在加载
+  pdfToolbar.classList.remove("hidden");
+  presetsContainer.classList.add("hidden");
+  pdfBookTitle.textContent = file.name;
+  pdfTotalPages.textContent = "解析中...";
+  pdfPageNum.value = 1;
+  playStatusText.textContent = `📖 正在读取《${file.name}》...`;
+
   const reader = new FileReader();
+
+  reader.onprogress = function(event) {
+    if (event.lengthComputable) {
+      const percent = Math.round((event.loaded / event.total) * 100);
+      playStatusText.textContent = `📖 正在读取《${file.name}》(${percent}%)...`;
+    }
+  };
 
   reader.onload = async function(e) {
     try {
+      playStatusText.textContent = `📖 正在解析文档结构...`;
       const typedArray = new Uint8Array(e.target.result);
       const loadingTask = pdfjsLib.getDocument({ data: typedArray });
       
@@ -229,25 +244,21 @@ function processPdfFile(file) {
       currentPdfName = file.name;
       currentPdfPage = 1;
 
-      // 更新 PDF 工具栏
-      pdfBookTitle.textContent = currentPdfName;
+      // 更新页数
       pdfTotalPages.textContent = totalPdfPages;
       pdfPageNum.max = totalPdfPages;
       pdfPageNum.value = 1;
 
-      pdfToolbar.classList.remove("hidden");
-      presetsContainer.classList.add("hidden");
-
       // 提取第 1 页内容
       await loadPdfPage(1, false);
-
 
       // 重置 input 以便下次可以重新选择同名文件
       if (pdfFileInput) pdfFileInput.value = "";
     } catch (err) {
       console.error("PDF 解析失败:", err);
-      alert(`解析 PDF 失败: ${err.message}`);
+      alert(`解析 PDF 失败: ${err.message}\n请确认该文件是否为标准未加密的 PDF 文件。`);
       playStatusText.textContent = "解析 PDF 出错";
+      pdfTotalPages.textContent = "0";
     }
   };
 
@@ -258,6 +269,7 @@ function processPdfFile(file) {
 
   reader.readAsArrayBuffer(file);
 }
+
 
 
 // 提取指定页码的文本
