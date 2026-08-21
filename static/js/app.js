@@ -593,17 +593,19 @@ function updateTextStats() {
   textStats.textContent = `${count} 字 · 约 ${timeDesc}`;
 }
 
-// 解锁浏览器音频播放权限
+let audioUnlocked = false;
+
+// 解锁浏览器音频播放权限 (仅需单次解锁，绝不污染主播放器)
 function unlockAudioContext() {
-  if (!audioPlayer.src) {
-    audioPlayer.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
-  }
-  const p = audioPlayer.play();
-  if (p !== undefined) {
-    p.then(() => {
-      audioPlayer.pause();
-    }).catch(() => {});
-  }
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  try {
+    const dummy = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+    const p = dummy.play();
+    if (p !== undefined) {
+      p.then(() => dummy.pause()).catch(() => {});
+    }
+  } catch (e) {}
 }
 
 async function handlePlayPause() {
@@ -619,22 +621,29 @@ async function handlePlayPause() {
   const pitch = parseInt(pitchSlider.value, 10);
   const synthesisKey = `${text}_${selectedVoice}_${rate}_${pitch}`;
 
-  // 如果已经加载了当前参数生成的音频，直接切换播放/暂停
+  // 如果已经加载了当前参数生成的音频，直接无缝切换播放/暂停
   if (synthesisKey === lastSynthesizedKey && audioPlayer.src && audioPlayer.src.startsWith("blob:")) {
     if (audioPlayer.paused) {
       try {
         await audioPlayer.play();
+        playIcon.textContent = "⏸";
+        playStatusText.textContent = "正在朗读中...";
+        audioWave.classList.remove("hidden");
       } catch (err) {
         console.warn("Play error:", err);
       }
     } else {
       audioPlayer.pause();
+      playIcon.textContent = "▶";
+      playStatusText.textContent = "已暂停";
+      audioWave.classList.add("hidden");
     }
     return;
   }
 
   await startSpeechSynthesis();
 }
+
 
 // 核心语音合成与播放请求
 async function startSpeechSynthesis() {
