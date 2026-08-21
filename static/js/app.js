@@ -76,17 +76,35 @@ const presetsContainer = document.getElementById("presets-container");
 // 初始化
 document.addEventListener("DOMContentLoaded", () => {
   fetchServerInfo();
+  
+  // 1. 从本地存储读取用户之前调整保存的个性化偏好
+  const savedVoice = localStorage.getItem("story_reader_voice");
+  const savedRate = localStorage.getItem("story_reader_rate");
+  const savedPitch = localStorage.getItem("story_reader_pitch");
+  const savedAutoContinue = localStorage.getItem("story_reader_auto_continue");
+
+  if (savedVoice) {
+    selectedVoice = savedVoice;
+  }
+
+  // 恢复语速 (若无保存则默认 +12% 豆包轻快)
+  const initialRate = (savedRate !== null) ? parseInt(savedRate, 10) : 12;
+  rateSlider.value = initialRate;
+  updateRateDisplay(initialRate);
+
+  // 恢复音调 (若无保存则默认 +5Hz 灵动)
+  const initialPitch = (savedPitch !== null) ? parseInt(savedPitch, 10) : 5;
+  pitchSlider.value = initialPitch;
+  updatePitchDisplay(initialPitch);
+
+  // 恢复自动翻页勾选状态
+  if (savedAutoContinue !== null && pdfAutoContinue) {
+    pdfAutoContinue.checked = (savedAutoContinue === "true");
+  }
+
   fetchVoices();
   setupEventListeners();
   setupPdfHandlers();
-  
-  // 默认应用豆包灵动轻快参数 (+12% 语速, +5Hz 音调)
-  rateSlider.value = 12;
-  updateRateDisplay(12);
-  pitchSlider.value = 5;
-  updatePitchDisplay(5);
-  activeVoiceName.textContent = "晓伊 (豆包·灵动少女 / 像真人讲故事)";
-  currentVoiceTag.textContent = "👑 豆包活泼感 · 推荐";
   
   // 默认填入童话故事示例
   textInput.value = SAMPLE_TEXTS.story;
@@ -127,8 +145,9 @@ async function fetchVoices() {
 function renderVoiceGrid(voices) {
   voiceGrid.innerHTML = "";
   voices.forEach((v) => {
+    const isSelected = (v.id === selectedVoice);
     const card = document.createElement("div");
-    card.className = `voice-card ${v.id === selectedVoice ? "active" : ""}`;
+    card.className = `voice-card ${isSelected ? "active" : ""}`;
     card.dataset.id = v.id;
     card.innerHTML = `
       <div class="voice-card-info">
@@ -138,6 +157,11 @@ function renderVoiceGrid(voices) {
       <span class="voice-card-tag">${v.tag || v.gender}</span>
     `;
 
+    if (isSelected) {
+      currentVoiceTag.textContent = v.tag || "已选音色";
+      activeVoiceName.textContent = v.name;
+    }
+
     card.addEventListener("click", () => {
       document.querySelectorAll(".voice-card").forEach(c => c.classList.remove("active"));
       card.classList.add("active");
@@ -145,20 +169,14 @@ function renderVoiceGrid(voices) {
       currentVoiceTag.textContent = v.tag || "已选音色";
       activeVoiceName.textContent = v.name;
 
-      // 自动切换为该音色专属的最佳人声语速和语调调校
-      if (v.default_rate !== undefined) {
-        rateSlider.value = v.default_rate;
-        updateRateDisplay(v.default_rate);
-      }
-      if (v.default_pitch !== undefined) {
-        pitchSlider.value = v.default_pitch;
-        updatePitchDisplay(v.default_pitch);
-      }
+      // 记忆保存音色选择
+      localStorage.setItem("story_reader_voice", v.id);
     });
 
     voiceGrid.appendChild(card);
   });
 }
+
 
 function updateRateDisplay(val) {
   if (val === 0) rateValue.textContent = "原速 (1.0x)";
@@ -225,6 +243,13 @@ function setupPdfHandlers() {
     }
   });
 
+  // 自动连续翻页勾选状态记忆
+  if (pdfAutoContinue) {
+    pdfAutoContinue.addEventListener("change", () => {
+      localStorage.setItem("story_reader_auto_continue", pdfAutoContinue.checked);
+    });
+  }
+
   // 关闭 PDF 模式
   btnClosePdf.addEventListener("click", () => {
     currentPdfDoc = null;
@@ -238,6 +263,7 @@ function setupPdfHandlers() {
     updateTextStats();
   });
 }
+
 
 // 解析 PDF 文件
 function processPdfFile(file) {
@@ -468,16 +494,19 @@ function setupEventListeners() {
     updateTextStats();
   });
 
-  // 滑块事件
+  // 滑块事件 (自动实时记忆保存用户设定的语速与音调)
   rateSlider.addEventListener("input", () => {
     const val = parseInt(rateSlider.value, 10);
     updateRateDisplay(val);
+    localStorage.setItem("story_reader_rate", val);
   });
 
   pitchSlider.addEventListener("input", () => {
     const val = parseInt(pitchSlider.value, 10);
     updatePitchDisplay(val);
+    localStorage.setItem("story_reader_pitch", val);
   });
+
 
 
   // 播放与暂停
