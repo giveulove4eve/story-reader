@@ -304,18 +304,36 @@ function processPdfFile(file) {
 
 
 
-// 智能排版清理：消除中文断字换行、跨行拼接、清除中文内部多余空格
+// 智能排版清理：消除装饰星号、消除目录虚线、拼接中文跨行断词、数字与章节自然呼吸停顿
 function cleanPdfText(text) {
   if (!text) return '';
 
-  // 1. 消除行内中文字符之间的多余排版空格 (不包含换行)
+  // 1. 过滤装饰性星号、井号、多余符号 (避免读出“星号星号”)
+  text = text.replace(/[*#~_=■▲◆●]{1,}/g, ' ');
+
+  // 2. 过滤目录虚线引导点 (如 ........................... 或 …………………… 或 ------------)
+  text = text.replace(/[\.·•…]{2,}/g, '，');
+  text = text.replace(/[-—]{2,}/g, '，');
+
+  // 3. 过滤首尾孤立的装饰小黑点 (如 ·目錄· -> 目錄)
+  text = text.replace(/(^|\s)[·•●]([\p{Script=Han}])/gu, '$1$2');
+  text = text.replace(/([\p{Script=Han}])[·•●](\s|$)/gu, '$1$2');
+  text = text.replace(/·/g, ' ');
+
+  // 4. 消除行内中文字符之间的多余排版空格 (不包含换行)
   text = text.replace(/([\p{Script=Han}])[ \t\u3000]+([\p{Script=Han}])/gu, '$1$2');
 
-  // 2. 消除中文与中文标点之间的空格
+  // 5. 消除中文与中文标点之间的空格
   text = text.replace(/([\p{Script=Han}])[ \t\u3000]+([，。！？；：、）》」』”’])/gu, '$1$2');
   text = text.replace(/([（《「『“‘])[ \t\u3000]+([\p{Script=Han}])/gu, '$1$2');
 
-  // 3. 处理跨行中文字符断开 (如 '思\n想' -> '思想', '生活中的\n實物' -> '生活中的實物')
+  // 6. 修复页码数字与紧贴文字之间的呼吸停顿 (如 '3秘密的揭露' -> '3，秘密的揭露')
+  text = text.replace(/(\d+)\s*([\p{Script=Han}])/gu, '$1， $2');
+
+  // 7. 修复连续章节名称之间的自然停顿 (如 '第一章第二章' -> '第一章，第二章')
+  text = text.replace(/(第[一二三四五六七八九十百千万0-9]+[章节卷回篇集部])\s*([\p{Script=Han}])/gu, '$1， $2');
+
+  // 8. 处理跨行中文字符断开 (如 '思\n想' -> '思想', '生活中的\n實物' -> '生活中的實物')
   // 当换行前不是句子结束标点（。！？!?；），且换行后是中文字符时，智能合并为同一行
   const lines = text.split(/\r?\n/);
   const merged = [];
@@ -355,8 +373,16 @@ function cleanPdfText(text) {
     merged.push(line);
   }
 
-  return merged.join('\n');
+  let result = merged.join('\n');
+
+  // 9. 清理连续多余逗号与空白
+  result = result.replace(/[，,]{2,}/g, '，');
+  result = result.replace(/[ \t\u3000]{2,}/g, ' ');
+  result = result.replace(/^[，,\s]+|[，,\s]+$/g, '');
+
+  return result.trim();
 }
+
 
 // 提取指定页码的文本
 async function loadPdfPage(pageNum, autoPlay = false) {

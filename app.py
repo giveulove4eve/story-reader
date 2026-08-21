@@ -122,18 +122,36 @@ class TTSRequest(BaseModel):
     volume: Optional[int] = 0
 
 def optimize_conversational_text(text: str) -> str:
-    """智能优化文本呼吸感、清除跨行断字与多余排版空格"""
+    """智能优化文本呼吸感、过滤装饰符号、消除目录虚线与断字"""
     if not text:
         return ""
         
-    # 1. 消除行内中文字符之间的多余排版空格 (如 '知覺 裡' -> '知覺裡')
+    # 1. 过滤装饰性星号、井号、多余符号 (避免读出“星号星号”)
+    text = re.sub(r'[*#~_=■▲◆●]{1,}', ' ', text)
+
+    # 2. 过滤目录虚线引导点 (如 ........................... 或 …………………… 或 ------------)
+    text = re.sub(r'[\.·•…]{2,}', '，', text)
+    text = re.sub(r'[-—]{2,}', '，', text)
+
+    # 3. 过滤首尾孤立的装饰小黑点 (如 ·目錄· -> 目錄)
+    text = re.sub(r'(^|\s)[·•●]([\u4e00-\u9fff])', r'\1\2', text)
+    text = re.sub(r'([\u4e00-\u9fff])[·•●](\s|$)', r'\1\2', text)
+    text = re.sub(r'·', ' ', text)
+
+    # 4. 消除行内中文字符之间的多余排版空格 (如 '知覺 裡' -> '知覺裡')
     text = re.sub(r'([\u4e00-\u9fff\u3000-\u303f\uff01-\uffee])[ \t\u3000]+([\u4e00-\u9fff\u3000-\u303f\uff01-\uffee])', r'\1\2', text)
     
-    # 2. 消除中文与中文标点之间的多余空格
+    # 5. 消除中文与中文标点之间的多余空格
     text = re.sub(r'([\u4e00-\u9fff])[ \t\u3000]+([，。！？；：、）》」』”’])', r'\1\2', text)
     text = re.sub(r'([（《「『“‘])[ \t\u3000]+([\u4e00-\u9fff])', r'\1\2', text)
 
-    # 3. 智能处理跨行断字 (如 '思\n想' -> '思想')
+    # 6. 修复页码数字与紧贴文字之间的呼吸停顿 (如 '3秘密的揭露' -> '3，秘密的揭露')
+    text = re.sub(r'(\d+)\s*([\u4e00-\u9fff])', r'\1， \2', text)
+
+    # 7. 修复连续章节名称之间的自然停顿 (如 '第一章第二章' -> '第一章，第二章')
+    text = re.sub(r'(第[一二三四五六七八九十百千万0-9]+[章节卷回篇集部])\s*([\u4e00-\u9fff])', r'\1， \2', text)
+
+    # 8. 智能处理跨行断字 (如 '思\n想' -> '思想')
     lines = text.splitlines()
     merged = []
     
@@ -168,11 +186,12 @@ def optimize_conversational_text(text: str) -> str:
         
     cleaned = "\n".join(merged)
     
-    # 4. 将机械化连续破折号转为自然停顿
-    cleaned = re.sub(r'—{2,}', '，', cleaned)
-    cleaned = re.sub(r'\.{3,}', '，', cleaned)
-    cleaned = re.sub(r'…{2,}', '，', cleaned)
-    return cleaned
+    # 9. 清理连续多余逗号与空白
+    cleaned = re.sub(r'[，,]{2,}', '，', cleaned)
+    cleaned = re.sub(r'[ \t\u3000]{2,}', ' ', cleaned)
+    cleaned = re.sub(r'^[，,\s]+|[，,\s]+$', '', cleaned)
+    return cleaned.strip()
+
 
 
 def get_local_ip():
