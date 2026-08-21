@@ -304,6 +304,60 @@ function processPdfFile(file) {
 
 
 
+// 智能排版清理：消除中文断字换行、跨行拼接、清除中文内部多余空格
+function cleanPdfText(text) {
+  if (!text) return '';
+
+  // 1. 消除行内中文字符之间的多余排版空格 (不包含换行)
+  text = text.replace(/([\p{Script=Han}])[ \t\u3000]+([\p{Script=Han}])/gu, '$1$2');
+
+  // 2. 消除中文与中文标点之间的空格
+  text = text.replace(/([\p{Script=Han}])[ \t\u3000]+([，。！？；：、）》」』”’])/gu, '$1$2');
+  text = text.replace(/([（《「『“‘])[ \t\u3000]+([\p{Script=Han}])/gu, '$1$2');
+
+  // 3. 处理跨行中文字符断开 (如 '思\n想' -> '思想', '生活中的\n實物' -> '生活中的實物')
+  // 当换行前不是句子结束标点（。！？!?；），且换行后是中文字符时，智能合并为同一行
+  const lines = text.split(/\r?\n/);
+  const merged = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) {
+      if (merged.length > 0 && merged[merged.length - 1] !== '') {
+        merged.push('');
+      }
+      continue;
+    }
+
+    if (merged.length > 0 && merged[merged.length - 1] !== '') {
+      const prev = merged[merged.length - 1];
+      const lastChar = prev.slice(-1);
+      const firstChar = line.charAt(0);
+
+      // 如果上一行结尾不是句子结束符（。！？!?；），则智能拼接
+      if (!/[。！？!?；]/.test(lastChar)) {
+        if (/[\p{Script=Han}，,、\(\)（）]/u.test(lastChar) && /[\p{Script=Han}（\(]/u.test(firstChar)) {
+          merged[merged.length - 1] = prev + line;
+          continue;
+        } else if (prev.endsWith('-')) {
+          merged[merged.length - 1] = prev.slice(0, -1) + line;
+          continue;
+        } else if (/[A-Za-z0-9]/.test(lastChar) && /[A-Za-z0-9]/.test(firstChar)) {
+          merged[merged.length - 1] = prev + ' ' + line;
+          continue;
+        } else {
+          merged[merged.length - 1] = prev + line;
+          continue;
+        }
+      }
+    }
+
+    merged.push(line);
+  }
+
+  return merged.join('\n');
+}
+
 // 提取指定页码的文本
 async function loadPdfPage(pageNum, autoPlay = false) {
   if (!currentPdfDoc) return;
@@ -320,19 +374,19 @@ async function loadPdfPage(pageNum, autoPlay = false) {
     const textContent = await page.getTextContent();
     
     // 合并段落文本
-    let extractedText = "";
+    let rawText = "";
     let lastY = null;
 
     textContent.items.forEach(item => {
-      // 简单根据 Y 坐标判断是否换行
+      // 检查 Y 坐标换行
       if (lastY !== null && Math.abs(item.transform[5] - lastY) > 8) {
-        extractedText += "\n";
+        rawText += "\n";
       }
-      extractedText += item.str;
+      rawText += item.str;
       lastY = item.transform[5];
     });
 
-    extractedText = extractedText.trim();
+    let extractedText = cleanPdfText(rawText);
     if (!extractedText) {
       extractedText = `【第 ${pageNum} 页为图片或无文字内容】`;
     }
@@ -349,6 +403,7 @@ async function loadPdfPage(pageNum, autoPlay = false) {
     console.error("提取页面文字失败:", err);
   }
 }
+
 
 // 事件绑定
 function setupEventListeners() {

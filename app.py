@@ -122,15 +122,58 @@ class TTSRequest(BaseModel):
     volume: Optional[int] = 0
 
 def optimize_conversational_text(text: str) -> str:
-    """智能优化文本呼吸感与连读节奏"""
-    # 连贯化 PDF 换行
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    cleaned = " ".join(lines)
-    # 将机械化长破折号或连续点转为自然停顿逗号
+    """智能优化文本呼吸感、清除跨行断字与多余排版空格"""
+    if not text:
+        return ""
+        
+    # 1. 消除行内中文字符之间的多余排版空格 (如 '知覺 裡' -> '知覺裡')
+    text = re.sub(r'([\u4e00-\u9fff\u3000-\u303f\uff01-\uffee])[ \t\u3000]+([\u4e00-\u9fff\u3000-\u303f\uff01-\uffee])', r'\1\2', text)
+    
+    # 2. 消除中文与中文标点之间的多余空格
+    text = re.sub(r'([\u4e00-\u9fff])[ \t\u3000]+([，。！？；：、）》」』”’])', r'\1\2', text)
+    text = re.sub(r'([（《「『“‘])[ \t\u3000]+([\u4e00-\u9fff])', r'\1\2', text)
+
+    # 3. 智能处理跨行断字 (如 '思\n想' -> '思想')
+    lines = text.splitlines()
+    merged = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            if merged and merged[-1] != "":
+                merged.append("")
+            continue
+            
+        if merged and merged[-1] != "":
+            prev = merged[-1]
+            last_char = prev[-1] if prev else ""
+            first_char = line[0] if line else ""
+            
+            # 如果上一行末尾不是句末终结标点（。！？!?；），则合并为同一句
+            if last_char not in ('。', '！', '？', '!', '?', '；'):
+                if re.match(r'[\u4e00-\u9fff，,、\(\)（）]', last_char) and re.match(r'[\u4e00-\u9fff（\(]', first_char):
+                    merged[-1] = prev + line
+                    continue
+                elif prev.endswith('-'):
+                    merged[-1] = prev[:-1] + line
+                    continue
+                elif re.match(r'[A-Za-z0-9]', last_char) and re.match(r'[A-Za-z0-9]', first_char):
+                    merged[-1] = prev + " " + line
+                    continue
+                else:
+                    merged[-1] = prev + line
+                    continue
+                    
+        merged.append(line)
+        
+    cleaned = "\n".join(merged)
+    
+    # 4. 将机械化连续破折号转为自然停顿
     cleaned = re.sub(r'—{2,}', '，', cleaned)
     cleaned = re.sub(r'\.{3,}', '，', cleaned)
     cleaned = re.sub(r'…{2,}', '，', cleaned)
     return cleaned
+
 
 def get_local_ip():
     """获取本机局域网 IP 地址"""
