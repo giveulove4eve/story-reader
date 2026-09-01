@@ -121,10 +121,84 @@ class TTSRequest(BaseModel):
     pitch: Optional[int] = 5  # 默认 +5Hz 带来灵动的少女音调
     volume: Optional[int] = 0
 
-def optimize_conversational_text(text: str) -> str:
-    """智能优化文本呼吸感、过滤视觉Emoji、智能序号分级与消除断字"""
+def reconstruct_tables_and_grids(text: str) -> str:
+    """自动将从 ChatGPT / Notion 复制的表格或多列文本重组为播音级口语表达"""
     if not text:
         return ""
+
+    lines = text.splitlines()
+    reconstructed = []
+    table_headers = None
+    in_table = False
+    
+    for line in lines:
+        raw_line = line.strip()
+        if not raw_line:
+            reconstructed.append("")
+            table_headers = None
+            in_table = False
+            continue
+            
+        # 1. 跳过 Markdown 表格分隔线 | --- | --- |
+        if re.match(r'^[\|\s\-\:\+]+$', raw_line) and ('-' in raw_line or '|' in raw_line):
+            continue
+
+        # 2. 拆分列（支持 Tab 制表符、Markdown 竖线 '|'、或者 2 个以上空格）
+        if '|' in raw_line:
+            cols = [c.strip() for c in raw_line.split('|') if c.strip()]
+        elif '\t' in raw_line:
+            cols = [c.strip() for c in raw_line.split('\t') if c.strip()]
+        elif re.search(r'\s{2,}', raw_line):
+            cols = [c.strip() for c in re.split(r'\s{2,}', raw_line) if c.strip()]
+        else:
+            cols = [raw_line]
+
+        # 3. 如果是多列表头 (如 '层级 类型 举例' 或 '序号 名称 说明')
+        if len(cols) >= 2 and any(k in cols[0] for k in ['层级', '序号', '排名', '编号', '步骤', '级别', '项目', '名称', '类型', 'No', 'ID']):
+            table_headers = cols
+            in_table = True
+            continue
+
+        # 4. 如果是表格数据行 (如 '1  Distributor  Pali Pali / 3DExpress')
+        if in_table and len(cols) >= 2:
+            c1 = cols[0]
+            c2 = cols[1]
+            c3 = cols[2] if len(cols) > 2 else ""
+            
+            c2 = re.sub(r'\s*/\s*', '，或者 ', c2)
+            if c3:
+                c3 = re.sub(r'\s*/\s*', '，或者 ', c3)
+
+            header1_name = table_headers[0] if (table_headers and len(table_headers) > 0) else '第'
+            header3_name = table_headers[2] if (table_headers and len(table_headers) > 2) else '举例'
+            
+            if re.match(r'^\d+$', c1):
+                prefix = f"第 {c1} {header1_name if header1_name not in ('序号','编号','No','ID') else '点'}："
+            else:
+                prefix = f"{c1}："
+                
+            if c3:
+                speech_row = f"{prefix}{c2}，{header3_name}有：{c3}。"
+            else:
+                speech_row = f"{prefix}{c2}。"
+                
+            reconstructed.append(speech_row)
+            continue
+
+        # 普通正文行，将单词间的独立斜杠转为'或者'
+        line_clean = re.sub(r'([\u4e00-\u9fffA-Za-z0-9])\s*/\s*([\u4e00-\u9fffA-Za-z0-9])', r'\1，或者 \2', raw_line)
+        reconstructed.append(line_clean)
+
+    return "\n".join(reconstructed)
+
+def optimize_conversational_text(text: str) -> str:
+    """智能优化文本呼吸感、自动重组表格、过滤视觉Emoji、智能序号分级与消除断字"""
+    if not text:
+        return ""
+        
+    # 0. 先将 ChatGPT 复制的表格/多列格式重构为自然口语
+    text = reconstruct_tables_and_grids(text)
+
         
     # 1. 过滤和转换视觉 Emoji 符号 (避免读出'白色加粗勾号'/'粗对勾')
     text = re.sub(r'[✅✔️☑️√]', '，', text)
