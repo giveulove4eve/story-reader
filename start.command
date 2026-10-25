@@ -5,8 +5,15 @@ echo "================================================="
 echo "   🎙️ 正在启动 故事朗读器 (Story Voice)...   "
 echo "================================================="
 
+# 优先使用已安装 edge-tts 7.3.1 的 Python 3.10 环境
+if [ -x "/Library/Frameworks/Python.framework/Versions/3.10/bin/python3" ]; then
+    PYTHON_EXEC="/Library/Frameworks/Python.framework/Versions/3.10/bin/python3"
+else
+    PYTHON_EXEC="python3"
+fi
+
 # 检查并安装依赖
-python3 -m pip install -q -r requirements.txt
+"$PYTHON_EXEC" -m pip install -q -r requirements.txt
 
 # 在后台等待服务就绪后自动打开浏览器
 (
@@ -15,4 +22,4 @@ python3 -m pip install -q -r requirements.txt
 ) &
 
 # 启动服务
-python3 app.py
+"$PYTHON_EXEC" app.py
