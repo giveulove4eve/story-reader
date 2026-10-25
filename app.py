@@ -22,29 +22,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 精选高质量拟真音色列表 (置顶最像豆包的灵动活泼人声音色)
+# 精选高质量拟真音色列表 (置顶小龙女专属调校与灵动活泼人声音色)
 CURATED_VOICES = [
     {
-        "id": "zh-CN-XiaoyiNeural",
-        "name": "晓伊 (豆包·灵动少女 / 像真人讲故事)",
-        "gender": "Female",
-        "locale": "zh-CN",
-        "category": "故事与情感",
-        "description": "极具豆包感，语气轻快俏皮，情绪起伏生动，就像身边的活泼女孩在讲故事。",
-        "tag": "👑 最像豆包 · 推荐",
-        "default_rate": 12,
-        "default_pitch": 5
-    },
-    {
         "id": "zh-TW-HsiaoChenNeural",
-        "name": "晓晨 (豆包·甜美互动 / 超高真人感)",
+        "name": "小龙女 (专属调校 · 甜美灵动伴读)",
         "gender": "Female",
         "locale": "zh-TW",
         "category": "故事与情感",
-        "description": "真实自然的说话咬字与微嗲甜美感，语气自然微扬，完全摆脱机器死板味。",
-        "tag": "💖 极度逼真 · 推荐",
+        "description": "小龙女伴侣同款音色，自然微嗲甜美，语气生动起伏，最具真人情感温度。",
+        "tag": "👑 小龙女专属 · 推荐首选",
         "default_rate": 10,
         "default_pitch": 4
+    },
+    {
+        "id": "zh-CN-XiaoyiNeural",
+        "name": "小龙女·活泼版 (豆包·灵动少女)",
+        "gender": "Female",
+        "locale": "zh-CN",
+        "category": "故事与情感",
+        "description": "极具豆包感，语气轻快俏皮，情绪起伏生动，就像身边的活泼小龙女在讲故事。",
+        "tag": "💖 活泼灵动 · 推荐",
+        "default_rate": 12,
+        "default_pitch": 5
     },
     {
         "id": "zh-CN-XiaoxiaoNeural",
@@ -116,9 +116,9 @@ CURATED_VOICES = [
 
 class TTSRequest(BaseModel):
     text: str
-    voice: Optional[str] = "zh-CN-XiaoyiNeural"
-    rate: Optional[int] = 10  # 默认 +10% 带来豆包般的轻快节奏
-    pitch: Optional[int] = 5  # 默认 +5Hz 带来灵动的少女音调
+    voice: Optional[str] = "zh-TW-HsiaoChenNeural"
+    rate: Optional[int] = 10  # 默认 +10% 带来轻快自然节奏
+    pitch: Optional[int] = 4  # 默认 +4Hz 带来甜美音调
     volume: Optional[int] = 0
 
 def reconstruct_tables_and_grids(text: str) -> str:
@@ -340,34 +340,44 @@ async def synthesize_speech(req: TTSRequest):
     pitch_str = f"{'+' if req.pitch >= 0 else ''}{req.pitch}Hz"
     volume_str = f"{'+' if req.volume >= 0 else ''}{req.volume}%"
 
-    try:
-        communicate = edge_tts.Communicate(
-            text=text,
-            voice=req.voice or "zh-CN-XiaoyiNeural",
-            rate=rate_str,
-            pitch=pitch_str,
-            volume=volume_str
-        )
+    target_voice = req.voice or "zh-TW-HsiaoChenNeural"
+    candidate_voices = [target_voice]
+    fallback_voices = ["zh-TW-HsiaoChenNeural", "zh-CN-XiaoyiNeural", "zh-CN-XiaoxiaoNeural"]
+    for fb in fallback_voices:
+        if fb not in candidate_voices:
+            candidate_voices.append(fb)
 
-        audio_chunks = []
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_chunks.append(chunk["data"])
+    last_error = None
+    for voice_attempt in candidate_voices:
+        try:
+            communicate = edge_tts.Communicate(
+                text=text,
+                voice=voice_attempt,
+                rate=rate_str,
+                pitch=pitch_str,
+                volume=volume_str
+            )
 
-        audio_bytes = b"".join(audio_chunks)
-        if not audio_bytes:
-            raise HTTPException(status_code=500, detail="未能生成有效音频，请检查输入或网络连接")
+            audio_chunks = []
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    audio_chunks.append(chunk["data"])
 
-        return Response(
-            content=audio_bytes,
-            media_type="audio/mpeg",
-            headers={
-                "Content-Disposition": "inline; filename=speech.mp3",
-                "Cache-Control": "public, max-age=3600"
-            }
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"语音合成失败: {str(e)}")
+            audio_bytes = b"".join(audio_chunks)
+            if audio_bytes:
+                return Response(
+                    content=audio_bytes,
+                    media_type="audio/mpeg",
+                    headers={
+                        "Content-Disposition": "inline; filename=speech.mp3",
+                        "Cache-Control": "public, max-age=3600"
+                    }
+                )
+        except Exception as e:
+            last_error = e
+            continue
+
+    raise HTTPException(status_code=500, detail=f"语音合成失败: {str(last_error)}")
 
 # 挂载静态资源目录
 static_dir = os.path.join(os.path.dirname(__file__), "static")

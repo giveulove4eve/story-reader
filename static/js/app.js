@@ -15,7 +15,7 @@ const SAMPLE_TEXTS = {
 };
 
 let currentVoices = [];
-let selectedVoice = "zh-CN-XiaoyiNeural";
+let selectedVoice = "zh-TW-HsiaoChenNeural";
 let currentAudioUrl = null;
 let currentAudioBlob = null;
 let lastSynthesizedKey = "";
@@ -135,6 +135,9 @@ async function fetchVoices() {
     const res = await fetch("/api/voices");
     const data = await res.json();
     currentVoices = data.voices || [];
+    if (!localStorage.getItem("story_reader_voice") && currentVoices.length > 0) {
+      selectedVoice = currentVoices[0].id;
+    }
     renderVoiceGrid(currentVoices);
   } catch (err) {
     console.error("获取音色失败", err);
